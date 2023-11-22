@@ -1,8 +1,8 @@
 //File and Directory
 const fs = require('fs');
 const path = require('path');
-const multer  = require('multer');
-const file = multer({dest: 'resource/products/'});
+const multer = require('multer');
+const file = multer({ dest: 'resource/products/' });
 var bodyParser = require('body-parser');
 
 //Router
@@ -26,7 +26,7 @@ var models = initModels(sequelize);
 var Account = models.Account;
 var Role = models.Role;
 var FK_Account_Role = models.FK_Account_Role;
-var sessions=[];
+var sessions = [];
 
 router.use(
   session({
@@ -37,18 +37,18 @@ router.use(
   })
 );
 const isAuthenticated = (req, res, next) => {
-  if (req.req.headers.authorization) {
+  if (req.headers.authorization) {
     return next();
   } else {
-    return res.status(401).json({ message: 'Unauthenticated' });
+    return res.status(401).json({ message: 'Access denied !' });
   }
 };
-router.get('/sessions',async (req,res)=>{
+router.get('/sessions', async (req, res) => {
   res.send(sessions);
 });
-router.post('/logout', async (req,res)=>{
+router.post('/logout', async (req, res) => {
   const tk = req.headers.authorization
-  try{
+  try {
     sessions.forEach((ss, index) => {
       if (ss.token === tk) {
         sessions.splice(index, 1);
@@ -56,12 +56,12 @@ router.post('/logout', async (req,res)=>{
         res.status(200).send('loggout success !');
       }
     });
-  }catch(err){
+  } catch (err) {
     console.log(err);
   }
 });
 router.post('/login', async (req, res) => {
-  try{
+  try {
     const { username, password } = req.body;
     var account = await Account.findOne({
       where: {
@@ -71,17 +71,17 @@ router.post('/login', async (req, res) => {
     });
     if (account) {
       req.session.user = username;
-      const token = jwt.sign({ username } , 'ABC' , { expiresIn: '12h' } );
-      sessions.push({token: token, ssAccountId: account.id ,ssUsername : username});
-      console.log('Account ['+username+'] logged in | '+(new Date()).toLocaleString());
-      console.log('token: '+token);
-      return res.status(200).json({ message: 'Login successful' , token : token , account: JSON.stringify(account)});
-      } 
+      const token = jwt.sign({ username }, 'ABC', { expiresIn: '12h' });
+      sessions.push({ token: token, ssAccountId: account.id, ssUsername: username });
+      console.log('Account [' + username + '] logged in | ' + (new Date()).toLocaleString());
+      console.log('token: ' + token);
+      return res.status(200).json({ message: 'Login successful', token: token, account: JSON.stringify(account) });
+    }
     else {
       return res.status(401).json({ message: 'Unauthorized' });
     }
   }
-  catch(err){
+  catch (err) {
     console.log(req.body);
     console.log(err);
   }
@@ -95,8 +95,8 @@ router.get('/protected', isAuthenticated, (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const accounts = await Account.findAll({
-      include:{
-        model:Role,
+      include: {
+        model: Role,
         as: 'role_id_Roles'
       }
     });
@@ -109,16 +109,18 @@ router.get('/', async (req, res) => {
 
 // GET single account by ID
 router.get('/:id', async (req, res) => {
+  console.log(req.params.id);
   try {
-    const account = await Account.findByPk(req.params.id,{
-      include:{
-        model:Role,
+    const account = await Account.findByPk(req.params.id, {
+      include: {
+        model: Role,
         as: 'role_id_Roles'
       }
     });
     if (!account) {
       return res.status(404).send('Account not found');
     }
+    console.log(req.headers);
     res.json(account);
   } catch (err) {
     console.error(err);
@@ -127,15 +129,15 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create an account
-router.post('/', file.single('image') ,async (req, res) => {
+router.post('/', file.single('image'), async (req, res) => {
   try {
     const newAccount = await Account.create(req.body);
     await FK_Account_Role.create({
       account_id: newAccount.id, // id của user vừa tạo
-      role_id: 1, // id của từng role
+      role_id: 3, // id của từng role
     });
     const filepath = '../resource/accounts';
-    const fullPath = path.join(__dirname, filepath, newAccount.id.toString()+'/');
+    const fullPath = path.join(__dirname, filepath, newAccount.id.toString() + '/');
     fs.mkdir(fullPath, { recursive: true }, (err) => {
       if (err) {
         console.error('Không thể tạo thư mục:', err);
@@ -143,33 +145,33 @@ router.post('/', file.single('image') ,async (req, res) => {
         console.log('Thư mục đã được tạo thành công!');
       }
     });
-    if(req.file){
+    if (req.file) {
       console.log(req.file.originalname);
-    var target_path = fullPath + newAccount.id.toString()+'.jpg';
-    const tmp_path = req.file.path;
-    const src = fs.createReadStream(tmp_path);
-    var dest = fs.createWriteStream(target_path);
-    src.pipe(dest).once('close',()=>{
-      src.destroy();
-      fs.unlink(path.join(req.file.path), (err) => {
-        if (err) {
-          console.error('Không thể xoá file tạm thời:', err);
-        } else {
-          console.log('File tạm thời đã được xoá thành công!');
-        }
+      var target_path = fullPath + newAccount.id.toString() + '.jpg';
+      const tmp_path = req.file.path;
+      const src = fs.createReadStream(tmp_path);
+      var dest = fs.createWriteStream(target_path);
+      src.pipe(dest).once('close', () => {
+        src.destroy();
+        fs.unlink(path.join(req.file.path), (err) => {
+          if (err) {
+            console.error('Không thể xoá file tạm thời:', err);
+          } else {
+            console.log('File tạm thời đã được xoá thành công!');
+          }
+        });
       });
-    });
-    Account.findByPk(newAccount.id)
-    .then((instance) => {
-      if (instance) {
-        instance.image = 'http://jul2nd.ddns.net/resource/accounts/'+newAccount.id+'/'+newAccount.id+'.jpg';
-        return instance.save();
-      } else {
-        console.log('Không tìm thấy đối tượng để cập nhật.');
-      }
-    });
+      Account.findByPk(newAccount.id)
+        .then((instance) => {
+          if (instance) {
+            instance.image = 'http://jul2nd.ddns.net/resource/accounts/' + newAccount.id + '/' + newAccount.id + '.jpg';
+            return instance.save();
+          } else {
+            console.log('Không tìm thấy đối tượng để cập nhật.');
+          }
+        });
     }
-    else{
+    else {
       console.log('no file uploaded');
     }
     res.json(newAccount);
@@ -180,7 +182,7 @@ router.post('/', file.single('image') ,async (req, res) => {
 });
 
 // Update an account
-router.put('/:id', file.single('image') , async (req, res) => {
+router.put('/:id', file.single('image'), async (req, res) => {
   try {
     const account = await Account.findByPk(req.params.id);
     if (!account) {
@@ -188,32 +190,32 @@ router.put('/:id', file.single('image') , async (req, res) => {
     }
 
     await account.update(req.body);
-    if(req.file){
-    var target_path = fullPath + account.id.toString()+'.jpg';
-    const tmp_path = req.file.path;
-    const src = fs.createReadStream(tmp_path);
-    var dest = fs.createWriteStream(target_path);
-    src.pipe(dest).once('close',()=>{
-      src.destroy();
-      fs.unlink(path.join(req.file.path), (err) => {
-        if (err) {
-          console.error('Không thể xoá file tạm thời:', err);
-        } else {
-          console.log('File tạm thời đã được xoá thành công!');
-        }
+    if (req.file) {
+      var target_path = fullPath + account.id.toString() + '.jpg';
+      const tmp_path = req.file.path;
+      const src = fs.createReadStream(tmp_path);
+      var dest = fs.createWriteStream(target_path);
+      src.pipe(dest).once('close', () => {
+        src.destroy();
+        fs.unlink(path.join(req.file.path), (err) => {
+          if (err) {
+            console.error('Không thể xoá file tạm thời:', err);
+          } else {
+            console.log('File tạm thời đã được xoá thành công!');
+          }
+        });
       });
-    });
-    Account.findByPk(account.id)
-    .then((instance) => {
-      if (instance) {
-        instance.image = 'http://jul2nd.ddns.net/resource/accounts/'+account.id+'/'+account.id+'.jpg';
-        return instance.save();
-      } else {
-        console.log('Không tìm thấy đối tượng để cập nhật.');
-      }
-    });
+      Account.findByPk(account.id)
+        .then((instance) => {
+          if (instance) {
+            instance.image = 'http://jul2nd.ddns.net/resource/accounts/' + account.id + '/' + account.id + '.jpg';
+            return instance.save();
+          } else {
+            console.log('Không tìm thấy đối tượng để cập nhật.');
+          }
+        });
     }
-    else{
+    else {
       console.log('no file uploaded');
     }
     res.json(account);
