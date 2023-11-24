@@ -15,13 +15,14 @@ const productController = require('./controller/product.controller');
 const categoryController = require('./controller/category.controller');
 const brandController = require('./controller/brand.controller');
 const roleController = require('./controller/role.controller');
+const addressController = require('./controller/address.controller');
 
 app.use('/account',accountController);
 app.use('/product',productController);
 app.use('/category',categoryController);
 app.use('/brand',brandController);
 app.use('/role',roleController);
-
+app.use('/address',addressController);
 
 app.listen(80,async()=>{
     console.log('server running on port 80');

@@ -7,7 +7,6 @@ var bodyParser = require('body-parser');
 
 //Router
 const jwt = require('jsonwebtoken');
-const cookie = require('cookie');
 const express = require('express');
 const router = express.Router();
 router.use(express.json());
@@ -16,9 +15,9 @@ router.use(bodyParser.urlencoded({ extended: true }));
 
 //Session 
 const session = require('express-session');
-const MemoryStore = require('memorystore')(session);
 const cookieParser = require('cookie-parser');
 router.use(cookieParser());
+var sessions = [];
 //Model
 var sequelize = require('../connect');
 const initModels = require('../model/init-models').initModels;
@@ -26,7 +25,10 @@ var models = initModels(sequelize);
 var Account = models.Account;
 var Role = models.Role;
 var FK_Account_Role = models.FK_Account_Role;
-var sessions = [];
+var Ward = models.wards;
+var Province = models.provinces;
+var District = models.districts;
+
 
 router.use(
   session({
@@ -109,18 +111,36 @@ router.get('/', async (req, res) => {
 
 // GET single account by ID
 router.get('/:id', async (req, res) => {
-  console.log(req.params.id);
   try {
     const account = await Account.findByPk(req.params.id, {
-      include: {
+      include: [{
         model: Role,
-        as: 'role_id_Roles'
+        as: 'role_id_Roles',
+        attributes: ['id', 'name']
+      },{
+        model:Ward,
+        as:'ward_code_ward',
+        attributes: ['code', 'full_name'],
+        include:[
+          {
+            model: District,
+            as: 'district_code_district',
+            attributes: ['code', 'full_name'],
+            include: [
+              {
+                model: Province,
+                as: 'province_code_province',
+                attributes: ['code', 'full_name'],
+              },
+            ],
+          },
+        ]
       }
+      ]
     });
     if (!account) {
       return res.status(404).send('Account not found');
     }
-    console.log(req.headers);
     res.json(account);
   } catch (err) {
     console.error(err);
@@ -188,8 +208,10 @@ router.put('/:id', file.single('image'), async (req, res) => {
     if (!account) {
       return res.status(404).send('Account not found');
     }
-
+    const accimg = account.image;
     await account.update(req.body);
+    const filepath = '../resource/accounts';
+    const fullPath = path.join(__dirname, filepath, account.id.toString() + '/');
     if (req.file) {
       var target_path = fullPath + account.id.toString() + '.jpg';
       const tmp_path = req.file.path;

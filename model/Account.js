@@ -27,6 +27,14 @@ module.exports = function(sequelize, DataTypes) {
     email: {
       type: DataTypes.STRING(50),
       allowNull: true
+    },
+    ward_code: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      references: {
+        model: 'wards',
+        key: 'code'
+      }
     }
   }, {
     sequelize,

@@ -12,6 +12,11 @@ var _Post_Content = require("./Post_Content");
 var _Product = require("./Product");
 var _Role = require("./Role");
 var _Use = require("./Use");
+var _administrative_regions = require("./administrative_regions");
+var _administrative_units = require("./administrative_units");
+var _districts = require("./districts");
+var _provinces = require("./provinces");
+var _wards = require("./wards");
 
 function initModels(sequelize) {
   var Account = _Account(sequelize, DataTypes);
@@ -27,6 +32,11 @@ function initModels(sequelize) {
   var Product = _Product(sequelize, DataTypes);
   var Role = _Role(sequelize, DataTypes);
   var Use = _Use(sequelize, DataTypes);
+  var administrative_regions = _administrative_regions(sequelize, DataTypes);
+  var administrative_units = _administrative_units(sequelize, DataTypes);
+  var districts = _districts(sequelize, DataTypes);
+  var provinces = _provinces(sequelize, DataTypes);
+  var wards = _wards(sequelize, DataTypes);
 
   Account.belongsToMany(Role, { as: 'role_id_Roles', through: FK_Account_Role, foreignKey: "account_id", otherKey: "role_id" });
   Order.belongsToMany(Product, { as: 'product_id_Product_Items', through: Item, foreignKey: "order_id", otherKey: "product_id" });
@@ -60,6 +70,20 @@ function initModels(sequelize) {
   Role.hasMany(FK_Account_Role, { as: "FK_Account_Roles", foreignKey: "role_id"});
   FK_Product_Use.belongsTo(Use, { as: "use", foreignKey: "use_id"});
   Use.hasMany(FK_Product_Use, { as: "FK_Product_Uses", foreignKey: "use_id"});
+  provinces.belongsTo(administrative_regions, { as: "administrative_region", foreignKey: "administrative_region_id"});
+  administrative_regions.hasMany(provinces, { as: "provinces", foreignKey: "administrative_region_id"});
+  districts.belongsTo(administrative_units, { as: "administrative_unit", foreignKey: "administrative_unit_id"});
+  administrative_units.hasMany(districts, { as: "districts", foreignKey: "administrative_unit_id"});
+  provinces.belongsTo(administrative_units, { as: "administrative_unit", foreignKey: "administrative_unit_id"});
+  administrative_units.hasMany(provinces, { as: "provinces", foreignKey: "administrative_unit_id"});
+  wards.belongsTo(administrative_units, { as: "administrative_unit", foreignKey: "administrative_unit_id"});
+  administrative_units.hasMany(wards, { as: "wards", foreignKey: "administrative_unit_id"});
+  wards.belongsTo(districts, { as: "district_code_district", foreignKey: "district_code"});
+  districts.hasMany(wards, { as: "wards", foreignKey: "district_code"});
+  districts.belongsTo(provinces, { as: "province_code_province", foreignKey: "province_code"});
+  provinces.hasMany(districts, { as: "districts", foreignKey: "province_code"});
+  Account.belongsTo(wards, { as: "ward_code_ward", foreignKey: "ward_code"});
+  wards.hasMany(Account, { as: "Accounts", foreignKey: "ward_code"});
 
   return {
     Account,
@@ -75,6 +99,11 @@ function initModels(sequelize) {
     Product,
     Role,
     Use,
+    administrative_regions,
+    administrative_units,
+    districts,
+    provinces,
+    wards,
   };
 }
 module.exports = initModels;
