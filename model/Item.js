@@ -19,7 +19,11 @@ module.exports = function(sequelize, DataTypes) {
         key: 'id'
       }
     },
-    number: {
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    rating: {
       type: DataTypes.INTEGER,
       allowNull: true
     },

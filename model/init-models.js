@@ -1,6 +1,7 @@
 var DataTypes = require("sequelize").DataTypes;
 var _Account = require("./Account");
 var _Brand = require("./Brand");
+var _Cart = require("./Cart");
 var _Category = require("./Category");
 var _Comment = require("./Comment");
 var _FK_Account_Role = require("./FK_Account_Role");
@@ -21,6 +22,7 @@ var _wards = require("./wards");
 function initModels(sequelize) {
   var Account = _Account(sequelize, DataTypes);
   var Brand = _Brand(sequelize, DataTypes);
+  var Cart = _Cart(sequelize, DataTypes);
   var Category = _Category(sequelize, DataTypes);
   var Comment = _Comment(sequelize, DataTypes);
   var FK_Account_Role = _FK_Account_Role(sequelize, DataTypes);
@@ -38,12 +40,16 @@ function initModels(sequelize) {
   var provinces = _provinces(sequelize, DataTypes);
   var wards = _wards(sequelize, DataTypes);
 
+  Account.belongsToMany(Product, { as: 'product_id_Products', through: Cart, foreignKey: "account_id", otherKey: "product_id" });
   Account.belongsToMany(Role, { as: 'role_id_Roles', through: FK_Account_Role, foreignKey: "account_id", otherKey: "role_id" });
   Order.belongsToMany(Product, { as: 'product_id_Product_Items', through: Item, foreignKey: "order_id", otherKey: "product_id" });
+  Product.belongsToMany(Account, { as: 'account_id_Accounts', through: Cart, foreignKey: "product_id", otherKey: "account_id" });
   Product.belongsToMany(Order, { as: 'order_id_Orders', through: Item, foreignKey: "product_id", otherKey: "order_id" });
   Product.belongsToMany(Use, { as: 'use_id_Uses', through: FK_Product_Use, foreignKey: "product_id", otherKey: "use_id" });
-  Role.belongsToMany(Account, { as: 'account_id_Accounts', through: FK_Account_Role, foreignKey: "role_id", otherKey: "account_id" });
-  Use.belongsToMany(Product, { as: 'product_id_Products', through: FK_Product_Use, foreignKey: "use_id", otherKey: "product_id" });
+  Role.belongsToMany(Account, { as: 'account_id_Account_FK_Account_Roles', through: FK_Account_Role, foreignKey: "role_id", otherKey: "account_id" });
+  Use.belongsToMany(Product, { as: 'product_id_Product_FK_Product_Uses', through: FK_Product_Use, foreignKey: "use_id", otherKey: "product_id" });
+  Cart.belongsTo(Account, { as: "account", foreignKey: "account_id"});
+  Account.hasMany(Cart, { as: "Carts", foreignKey: "account_id"});
   Comment.belongsTo(Account, { as: "account", foreignKey: "account_id"});
   Account.hasMany(Comment, { as: "Comments", foreignKey: "account_id"});
   FK_Account_Role.belongsTo(Account, { as: "account", foreignKey: "account_id"});
@@ -62,6 +68,8 @@ function initModels(sequelize) {
   Post.hasMany(Comment, { as: "Comments", foreignKey: "post_id"});
   Post_Content.belongsTo(Post, { as: "post", foreignKey: "post_id"});
   Post.hasMany(Post_Content, { as: "Post_Contents", foreignKey: "post_id"});
+  Cart.belongsTo(Product, { as: "product", foreignKey: "product_id"});
+  Product.hasMany(Cart, { as: "Carts", foreignKey: "product_id"});
   FK_Product_Use.belongsTo(Product, { as: "product", foreignKey: "product_id"});
   Product.hasMany(FK_Product_Use, { as: "FK_Product_Uses", foreignKey: "product_id"});
   Item.belongsTo(Product, { as: "product", foreignKey: "product_id"});
@@ -84,10 +92,13 @@ function initModels(sequelize) {
   provinces.hasMany(districts, { as: "districts", foreignKey: "province_code"});
   Account.belongsTo(wards, { as: "ward_code_ward", foreignKey: "ward_code"});
   wards.hasMany(Account, { as: "Accounts", foreignKey: "ward_code"});
+  Order.belongsTo(wards, { as: "ward_code_ward", foreignKey: "ward_code"});
+  wards.hasMany(Order, { as: "Orders", foreignKey: "ward_code"});
 
   return {
     Account,
     Brand,
+    Cart,
     Category,
     Comment,
     FK_Account_Role,

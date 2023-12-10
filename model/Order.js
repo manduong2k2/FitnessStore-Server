@@ -22,6 +22,14 @@ module.exports = function(sequelize, DataTypes) {
     total: {
       type: DataTypes.INTEGER,
       allowNull: true
+    },
+    ward_code: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      references: {
+        model: 'wards',
+        key: 'code'
+      }
     }
   }, {
     sequelize,

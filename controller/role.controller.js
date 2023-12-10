@@ -1,17 +1,21 @@
 const express = require('express');
 const router = express.Router();
 router.use(express.json());
-
+const jwt = require('jsonwebtoken')
 var sequelize = require('../connect');
 const initModels = require('../model/init-models').initModels;
 var models = initModels(sequelize);
 var Role = models.Role;
+var Account = models.Account;
 
 // API GET all roles
 router.get('/', async (req, res) => {
   try {
-    const roles = await Role.findAll();
-    res.json(roles);
+    const token = req.headers.token ;
+    var decodedToken = jwt.verify(token, 'ABC'); 
+
+    const { roles } = decodedToken;
+    res.json(decodedToken);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });

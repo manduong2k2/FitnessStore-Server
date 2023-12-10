@@ -11,10 +11,6 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.STRING(50),
       allowNull: true
     },
-    icon: {
-      type: DataTypes.CHAR(50),
-      allowNull: true
-    },
     info: {
       type: DataTypes.TEXT,
       allowNull: true

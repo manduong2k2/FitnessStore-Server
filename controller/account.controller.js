@@ -5,6 +5,16 @@ const multer = require('multer');
 const file = multer({ dest: 'resource/products/' });
 var bodyParser = require('body-parser');
 
+//Mail
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'manduong2k2@gmail.com', // Thay thế bằng email của bạn
+    pass: 'kzihyxskesrhkeht', // Thay thế bằng mật khẩu của bạn hoặc mã xác thực ứng dụng
+  },
+});
+var verificationCodes = [];
 //Router
 const jwt = require('jsonwebtoken');
 const express = require('express');
@@ -12,14 +22,11 @@ const router = express.Router();
 router.use(express.json());
 router.use(bodyParser.json());
 router.use(bodyParser.urlencoded({ extended: true }));
+const { sessions, isAuthenticated, isAuthorized } = require('../token.authorizer');
 
-//Session 
-const session = require('express-session');
-const cookieParser = require('cookie-parser');
-router.use(cookieParser());
-var sessions = [];
 //Model
 var sequelize = require('../connect');
+const { where } = require('sequelize');
 const initModels = require('../model/init-models').initModels;
 var models = initModels(sequelize);
 var Account = models.Account;
@@ -29,35 +36,14 @@ var Ward = models.wards;
 var Province = models.provinces;
 var District = models.districts;
 
-
-router.use(
-  session({
-    secret: 'ABC', // Key bí mật để ký cookie
-    resave: false,
-    saveUninitialized: true,
-    cookie: { sameSite: 'none', secure: true }, // Chế độ secure: false cho phát triển, true cho production với HTTPS
-  })
-);
-const isAuthenticated = (req, res, next) => {
-  if (req.headers.authorization) {
-    return next();
-  } else {
-    return res.status(401).json({ message: 'Access denied !' });
-  }
-};
-router.get('/sessions', async (req, res) => {
-  res.send(sessions);
+router.get('/codes', async (req, res) => {
+  res.send(verificationCodes);
 });
 router.post('/logout', async (req, res) => {
-  const tk = req.headers.authorization
+  const token = req.headers.authorization
   try {
-    sessions.forEach((ss, index) => {
-      if (ss.token === tk) {
-        sessions.splice(index, 1);
-        console.log('Account [' + ss.ssUsername + '] logged out | ' + (new Date()).toLocaleString());
-        res.status(200).send('loggout success !');
-      }
-    });
+    console.log('Account [' + jwt.verify(token, 'ABC').account.username + '] logged out | ' + (new Date()).toLocaleString());
+    res.status(200).send('Account [' + jwt.verify(token, 'ABC').account.username + '] logged out | ' + (new Date()).toLocaleString());
   } catch (err) {
     console.log(err);
   }
@@ -65,18 +51,38 @@ router.post('/logout', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    var account = await Account.findOne({
+    var account;
+    account = await Account.findOne({
       where: {
         username: username || null,
         password: password || null
       },
+      include: {
+        model: Role,
+        as: 'role_id_Roles',
+        attributes: ['id', 'name'],
+        through: { attributes: [] }
+      }
     });
+    if(!account){
+      account = await Account.findOne({
+        where: {
+          email: username || null,
+          password: password || null
+        },
+        include: {
+          model: Role,
+          as: 'role_id_Roles',
+          attributes: ['id', 'name'],
+          through: { attributes: [] }
+        }
+      });
+    }
     if (account) {
-      req.session.user = username;
-      const token = jwt.sign({ username }, 'ABC', { expiresIn: '12h' });
-      sessions.push({ token: token, ssAccountId: account.id, ssUsername: username });
+      const roles = account.role_id_Roles.map(role => ({ id: role.id, name: role.name }));
+      const token = jwt.sign({ account: { id: account.id, username: account.username }, roles }, 'ABC');
+      sessions.push({ token: token, ssAccountId: account.id, ssRoles: account.role_id_Roles });
       console.log('Account [' + username + '] logged in | ' + (new Date()).toLocaleString());
-      console.log('token: ' + token);
       return res.status(200).json({ message: 'Login successful', token: token, account: JSON.stringify(account) });
     }
     else {
@@ -99,7 +105,9 @@ router.get('/', async (req, res) => {
     const accounts = await Account.findAll({
       include: {
         model: Role,
-        as: 'role_id_Roles'
+        as: 'role_id_Roles',
+        attributes: ['id', 'name'],
+        through: { attributes: [] }
       }
     });
     res.json(accounts);
@@ -116,12 +124,13 @@ router.get('/:id', async (req, res) => {
       include: [{
         model: Role,
         as: 'role_id_Roles',
-        attributes: ['id', 'name']
-      },{
-        model:Ward,
-        as:'ward_code_ward',
+        attributes: ['id', 'name'],
+        through: { attributes: [] }
+      }, {
+        model: Ward,
+        as: 'ward_code_ward',
         attributes: ['code', 'full_name'],
-        include:[
+        include: [
           {
             model: District,
             as: 'district_code_district',
@@ -176,8 +185,6 @@ router.post('/', file.single('image'), async (req, res) => {
         fs.unlink(path.join(req.file.path), (err) => {
           if (err) {
             console.error('Không thể xoá file tạm thời:', err);
-          } else {
-            console.log('File tạm thời đã được xoá thành công!');
           }
         });
       });
@@ -208,7 +215,6 @@ router.put('/:id', file.single('image'), async (req, res) => {
     if (!account) {
       return res.status(404).send('Account not found');
     }
-    const accimg = account.image;
     await account.update(req.body);
     const filepath = '../resource/accounts';
     const fullPath = path.join(__dirname, filepath, account.id.toString() + '/');
@@ -222,8 +228,6 @@ router.put('/:id', file.single('image'), async (req, res) => {
         fs.unlink(path.join(req.file.path), (err) => {
           if (err) {
             console.error('Không thể xoá file tạm thời:', err);
-          } else {
-            console.log('File tạm thời đã được xoá thành công!');
           }
         });
       });
@@ -246,29 +250,106 @@ router.put('/:id', file.single('image'), async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
-
-// Update specific fields of an account
-router.patch('/:id', async (req, res) => {
+function autoDeletePair(pair) {
+  const index = verificationCodes.indexOf(pair);
+  if (index !== -1) {
+    verificationCodes.splice(index, 1);
+  }
+}
+// recover account
+router.patch('/:email', async (req, res) => {
   try {
-    const account = await Account.findByPk(req.params.id);
+    var account;
+    account = await Account.findOne({
+      where: {
+        email: req.params.email,
+      }
+    });
+    if(!account) {
+      account = await Account.findOne({
+        where: {
+          username: req.params.email,
+        }
+      });
+    }
     if (!account) {
       return res.status(404).send('Account not found');
     }
-    await account.update(req.body);
-    res.json(account);
+    const randomNumber = Math.floor(Math.random() * 900000) + 100000;
+    const mailOptions = {
+      from: 'manduong2k2@gmail.com',
+      to: account.email,
+      subject: 'Khôi phục mật khẩu',
+      text: 'Xin chào ' + account.username + ' , đây là mã xác nhận mật khẩu của bạn , vui lòng không gửi mã này cho bất cứ ai: ' + randomNumber,
+    };
+    transporter.sendMail(mailOptions, function (error, info) {
+      if (error) {
+        console.error(error);
+        return res.status(500).send('Error sending email');
+      } else {
+        verificationCodes.push({ _email: req.params.email, _code: randomNumber });
+        console.log();
+        return res.status(200).send('Đã gửi mã xác thực đến email : [' + account.email + '] của bạn , vui lòng kiểm tra để lấy mã ');
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   }
 });
+router.post('/verify', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    const verificationPair = verificationCodes.find(pair => pair._email === email && pair._code.toString() === code.toString());
+    console.log(verificationPair);
+    if (verificationPair) {
+      verificationCodes.splice(verificationCodes.indexOf(verificationPair), 1);
+      const account = await Account.findOne({
+        where: {
+          email: email,
+        }
+      });
+      if (!account) {
+        return res.status(404).send('Account not found');
+      }
+      else {
+        const token = jwt.sign({account}, 'ABC');
+        return res.status(200).json({ success: true, token: token });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Verification failed' });
+    }
+  }catch(err){
+    console.log(err);
+  }
+});
 
-// Delete an account
+router.put('/',async (req,res)=>{
+  try{
+    const { password , token } = req.body;
+    const decodedToken = jwt.verify(token, 'ABC');
+    const account = decodedToken.account;
+    account.password = password;
+    if(!account){
+      console.log('Invalid token!');
+      res.status(404).send('Invalid token');
+    }
+    account.password = password;
+    await Account.update({ password }, { where: { id: account.id } });
+    res.status(200).send('Change password success');
+  }catch(err){
+    console.log(err);
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const account = await Account.findByPk(req.params.id);
     if (!account) {
       return res.status(404).send('Account not found');
     }
+    const imagePath = path.join(__dirname, '../resource/accounts', account.id.toString());
+    fs.rmSync(imagePath, { recursive: true });
     await account.destroy();
     res.send('Account deleted');
   } catch (err) {

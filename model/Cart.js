@@ -1,25 +1,25 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
   return sequelize.define('Cart', {
-    id: {
-      autoIncrement: true,
+    product_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      primaryKey: true
-    },
-    date: {
-      type: DataTypes.DATEONLY,
-      allowNull: true
+      primaryKey: true,
+      references: {
+        model: 'Product',
+        key: 'id'
+      }
     },
     account_id: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
+      primaryKey: true,
       references: {
         model: 'Account',
         key: 'id'
       }
     },
-    total: {
+    quantity: {
       type: DataTypes.INTEGER,
       allowNull: true
     }
@@ -30,10 +30,11 @@ module.exports = function(sequelize, DataTypes) {
     timestamps: false,
     indexes: [
       {
-        name: "PK_Cart",
+        name: "PK_Cart_1",
         unique: true,
         fields: [
-          { name: "id" },
+          { name: "product_id" },
+          { name: "account_id" },
         ]
       },
     ]

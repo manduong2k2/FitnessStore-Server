@@ -26,6 +26,10 @@ module.exports = function(sequelize, DataTypes) {
     contents: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
     }
   }, {
     sequelize,

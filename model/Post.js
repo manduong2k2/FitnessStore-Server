@@ -2,9 +2,14 @@ const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
   return sequelize.define('Post', {
     id: {
+      autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
+    },
+    intro: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     author_id: {
       type: DataTypes.INTEGER,
@@ -16,6 +21,10 @@ module.exports = function(sequelize, DataTypes) {
     },
     title: {
       type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    date: {
+      type: DataTypes.DATEONLY,
       allowNull: true
     },
     background: {
