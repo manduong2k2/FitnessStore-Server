@@ -8,6 +8,7 @@ const { Op } = require('sequelize');
 //Router
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 router.use(express.json());
 router.use(bodyParser.json());
 router.use(bodyParser.urlencoded({ extended: true }));
@@ -22,6 +23,7 @@ var Brand = models.Brand;
 var Category = models.Category;
 var Use = models.Use;
 var Item = models.Item;
+var Watch = models.Watch;
 
 
 // GET all products
@@ -72,6 +74,32 @@ router.get('/search/:name', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
+  }
+});
+
+router.post('/watch/:id', async (req,res) =>{
+  try{
+    var product_id = req.params.id;
+    var account_id = jwt.verify(req.headers.authorization, 'ABC').account.id;
+    const watch = await Watch.findOne({
+      where: {
+        product_id: product_id,
+        account_id: account_id,
+      },
+    });
+    if(watch){
+      await watch.increment('times');
+      res.status(200).send('success');
+    }else{
+      await Watch.create({
+        product_id: product_id,
+        account_id: account_id,
+        times: 1, 
+      });
+    }
+  }catch(err){
+    console.log(err);
+    res.json('Server Error');
   }
 });
 

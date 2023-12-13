@@ -7,6 +7,7 @@ router.use(express.json());
 router.use(bodyParser.json());
 router.use(bodyParser.urlencoded({ extended: true }));
 const { Op, where } = require('sequelize');
+const jwt = require('jsonwebtoken');
 
 //Model
 var sequelize = require('../connect');
@@ -18,11 +19,12 @@ var Order = models.Order;
 var Item = models.Item;
 var Brand = models.Brand;
 var Category = models.Category;
+var Watch = models.Watch;
 
-router.get('/:account_id', async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         // Lấy id tài khoản từ headers
-        const accountId = req.params.account_id;
+        const accountId = jwt.verify(req.headers.authorization, 'ABC').account.id;
 
         // Tìm tài khoản theo id
         const account = await Account.findByPk(accountId, {
@@ -103,8 +105,8 @@ async function calculateCollaborativeFilteringRecommendations(allItems) {
     );
 
     // Chọn ra một số sản phẩm có điểm trung bình hài lòng cao nhất
-    const topProductsId = sortedProducts.slice(0, 5); // Chọn 5 sản phẩm, bạn có thể điều chỉnh số lượng theo nhu cầu
-    
+    const topProductsId = sortedProducts; // Chọn 5 sản phẩm, bạn có thể điều chỉnh số lượng theo nhu cầu
+
     // Lấy danh sách các sản phẩm có ID nằm trong topProductsId
     const topProducts = await Product.findAll({ where: { id: topProductsId.map(Number) } });
 
@@ -126,6 +128,24 @@ async function calculateCollaborativeFilteringRecommendations(allItems) {
     return relatedProducts;
 }
 
+router.get('/watched', async (req, res) => {
+    try {
+        var account_id = jwt.verify(req.headers.token, 'ABC').account.id;
+        const watchlogs = await Watch.findAll(
+            {
+                where: { account_id },
+                order: [[sequelize.literal('times'), 'DESC']],
+            }
+        );
+        const watchedProducts = await Product.findAll({
+            where: { id: watchlogs.map(log => log.product_id) },
+          });
+        res.json(watchedProducts);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send(err);
+    }
+});
 
 
 module.exports = router;

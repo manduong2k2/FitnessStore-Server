@@ -11,30 +11,31 @@ app.use(bodyParser.json({limit: '50mb'}));
 app.use(cors());
 app.use('/resource', express.static(path.join(__dirname, 'resource')));
 
-//controllers 
-const accountController = require('./controller/account.controller');
-const productController = require('./controller/product.controller');
-const categoryController = require('./controller/category.controller');
-const brandController = require('./controller/brand.controller');
-const roleController = require('./controller/role.controller');
-const addressController = require('./controller/address.controller');
-const cartController = require('./controller/cart.controller');
-const postController = require('./controller/post.controller');
-const post_contentController = require('./controller/post_content.controller');
-const orderController = require('./controller/order.controller');
-const recommendController = require('./controller/recommend.controller');
 
-app.use('/account',accountController);
-app.use('/product',productController);
-app.use('/category',categoryController);
-app.use('/brand',brandController);
-app.use('/role',roleController);
-app.use('/address',addressController);
-app.use('/cart',cartController);
-app.use('/post',postController);
-app.use('/post_content',post_contentController);
-app.use('/order',orderController);
-app.use('/recommend',recommendController);
+//Servicess 
+const accountServices = require('./service/account.services');
+const productServices = require('./service/product.services');
+const categoryServices = require('./service/category.services');
+const brandServices = require('./service/brand.services');
+const roleServices = require('./service/role.services');
+const addressServices = require('./service/address.services');
+const cartServices = require('./service/cart.services');
+const postServices = require('./service/post.services');
+const post_contentServices = require('./service/post_content.services');
+const orderServices = require('./service/order.services');
+const recommendServices = require('./service/recommend.services');
+
+app.use('/account',accountServices);
+app.use('/product',productServices);
+app.use('/category',categoryServices);
+app.use('/brand',brandServices);
+app.use('/role',roleServices);
+app.use('/address',addressServices);
+app.use('/cart',cartServices);
+app.use('/post',postServices);
+app.use('/post_content',post_contentServices);
+app.use('/order',orderServices);
+app.use('/recommend',recommendServices);
 
 app.listen(80,async()=>{
     console.log('server running on port 80');
