@@ -115,8 +115,8 @@ router.post('/', isAuthenticated, async (req, res) => {
                 const orderItem = await Item.create({
                     order_id: order.id,
                     product_id: product.id,
-                    quantity: cart.quantity,
-                    cost: product.price * cart.quantity
+                    quantity: cart.number,
+                    cost: product.price * cart.number
                 });
                 return orderItem;
             }));

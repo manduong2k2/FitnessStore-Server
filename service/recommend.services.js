@@ -23,11 +23,8 @@ var Watch = models.Watch;
 
 router.get('/', async (req, res) => {
     try {
-        // Lấy id tài khoản từ headers
         const accountId = jwt.verify(req.headers.authorization, 'ABC').account.id;
-
-        // Tìm tài khoản theo id
-        const account = await Account.findByPk(accountId, {
+        const user = await Account.findByPk(accountId, {
             include: [
                 {
                     model: Order,
@@ -35,117 +32,183 @@ router.get('/', async (req, res) => {
                     include: [
                         {
                             model: Item,
-                            as: 'Items',
-                            include: [{
-                                model: Product,
-                                as: 'product',
-                            },
-                            {
-                                model: Order,
-                                as: 'order',
-                                include: [{
-                                    model: Account,
-                                    as: 'account',
-                                }]
-                            }
-                            ],
+                            as: 'Items'
                         }
                     ],
                 },
             ],
         });
 
-        if (!account) {
+        if (!user) {
             return res.status(404).json({ error: 'Tài khoản không tồn tại' });
         }
 
-        // Tạo một mảng chung chứa tất cả các mục từ tất cả các đơn hàng
-        const allItems = account.Orders.flatMap((order) => order.Items);
+        const items = getUserItems(user);
 
-        // Tính toán đề xuất dựa trên logic của bạn
-        const recommendedProducts = await calculateCollaborativeFilteringRecommendations(allItems);
-        console.log(recommendedProducts);
-        // Trả về danh sách sản phẩm được đề xuất
-        res.json({ recommendedProducts });
+        const recommenddedProductIds = await UBCF(items);
+
+        const recommenddedProducts = await Product.findAll({
+            where:{
+                id:recommenddedProductIds
+            }
+        });
+
+        res.json( recommenddedProducts );
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Lỗi server' });
     }
 });
 
-async function calculateCollaborativeFilteringRecommendations(allItems) {
-    // Tạo một đối tượng để theo dõi độ hài lòng của mỗi sản phẩm
-    const productSatisfaction = {};
+function getUserItems(user){
+    const items = user.Orders.flatMap((order) => order.Items).map(item => ({
+        user_id: user.id,
+        product_id: item.product_id,
+        rating: item.rating
+    }));
 
-    // Duyệt qua mỗi mục trong lịch sử mua hàng
-    allItems.forEach((item) => {
-        const productId = item.product.id;
-
-        // Tính điểm đánh giá dựa trên quantity và rating
-        const ratingScore = item.rating * item.quantity;
-
-        // Tính tổng điểm hài lòng cho mỗi sản phẩm
-        if (!productSatisfaction[productId]) {
-            productSatisfaction[productId] = { score: 0, count: 0 };
+    const groupedItems = items.reduce((acc, item) => {
+        const key = `${item.user_id}_${item.product_id}`;
+        if (!acc[key]) {
+            acc[key] = { sum: 0, count: 0 };
         }
-        productSatisfaction[productId].score += ratingScore;
-        productSatisfaction[productId].count += 1;
+        acc[key].sum += item.rating;
+        acc[key].count += 1;
+        return acc;
+    }, {});
+
+    const averageItems = Object.entries(groupedItems).map(([key, value]) => {
+        const [userId, productId] = key.split('_');
+        return {
+            user_id: parseInt(userId, 10),
+            product_id: parseInt(productId, 10),
+            avgRating: value.sum / value.count
+        };
     });
-
-    // Tính điểm trung bình hài lòng cho mỗi sản phẩm
-    const averageProductSatisfaction = {};
-    Object.keys(productSatisfaction).forEach((productId) => {
-        const { score, count } = productSatisfaction[productId];
-        averageProductSatisfaction[productId] = count > 0 ? score / count : 0;
-    });
-
-    // Sắp xếp sản phẩm theo điểm trung bình hài lòng giảm dần
-    const sortedProducts = Object.keys(averageProductSatisfaction).sort(
-        (a, b) => averageProductSatisfaction[b] - averageProductSatisfaction[a]
-    );
-
-    // Chọn ra một số sản phẩm có điểm trung bình hài lòng cao nhất
-    const topProductsId = sortedProducts; // Chọn 5 sản phẩm, bạn có thể điều chỉnh số lượng theo nhu cầu
-
-    // Lấy danh sách các sản phẩm có ID nằm trong topProductsId
-    const topProducts = await Product.findAll({ where: { id: topProductsId.map(Number) } });
-
-    // Lấy danh sách các brand_id và category_id từ topProducts
-    const brandIds = [...new Set(topProducts.map((product) => product.brand_id))];
-    const categoryIds = [...new Set(topProducts.map((product) => product.category_id))];
-
-    // Tìm các sản phẩm có brand_id hoặc category_id giống với topProducts
-    const relatedProducts = await Product.findAll({
-        where: {
-            [Op.or]: [
-                { brand_id: { [Op.in]: brandIds } },
-                { category_id: { [Op.in]: categoryIds } },
-            ],
-            id: { [Op.notIn]: topProducts.map((product) => product.id) }, // Loại bỏ các sản phẩm đã có trong topProducts
-        },
-    });
-
-    return relatedProducts;
+    return averageItems;
 }
 
-router.get('/watched', async (req, res) => {
-    try {
-        var account_id = jwt.verify(req.headers.token, 'ABC').account.id;
-        const watchlogs = await Watch.findAll(
+async function UBCF(targetUserItems) {
+    const allUsers = await Account.findAll({
+        include: [
             {
-                where: { account_id },
-                order: [[sequelize.literal('times'), 'DESC']],
-            }
-        );
-        const watchedProducts = await Product.findAll({
-            where: { id: watchlogs.map(log => log.product_id) },
-          });
-        res.json(watchedProducts);
-    } catch (err) {
-        console.log(err);
-        res.status(500).send(err);
+                model: Order,
+                as: 'Orders',
+                include: [
+                    {
+                        model: Item,
+                        as: 'Items'
+                    }
+                ],
+            },
+        ],
+    });
+
+    // Tính toán độ tương đồng giữa target user và các users khác
+    const similarities = [];
+    for (const user of allUsers) {
+        if (user.id !== targetUserItems[0].user_id) {
+            const commonItems = getCommonItems(targetUserItems, getUserItems(user));
+            const similarity = calculateSimilarity(targetUserItems, getUserItems(user), commonItems);
+            similarities.push({user, similarity});
+        }
     }
+    // Lấy ra 5 user tương đồng
+    const topSimilarUsers = similarities.slice(0, 5);
+
+    // Trả về các items của mỗi user đó, loại bỏ các items đã có trong targetUserItems
+    const recommendations = [];
+    for (const { user } of topSimilarUsers) {
+        const userItems = getUserItems(user);
+        const newItems = userItems.filter(item => !targetUserItems.some(targetItem => targetItem.product_id === item.product_id));
+        newItems.forEach(item => {
+            recommendations.push( item.product_id );
+        });
+    }
+    return recommendations;
+}
+
+// Hàm tính toán độ tương đồng giữa hai users
+function calculateSimilarity(user1Items, user2Items, commonItems) {
+    const intersectionSize = commonItems.length;
+    const unionSize = new Set([...user1Items, ...user2Items].map(item => item.product_id)).size;
+
+    if (unionSize === 0) {
+        return 0;
+    }
+
+    return intersectionSize / unionSize;
+}
+
+// Hàm lấy ra các items chung giữa hai users
+function getCommonItems(user1Items, user2Items) {
+    return user1Items.filter(item1 => user2Items.some(item2 => item2.product_id === item1.product_id));
+}
+
+router.get('/topSolds',async (req,res)=>{
+    const products = await Product.findAll({
+        include:{
+            model:Order,
+            as:'order_id_Orders',
+            include:{
+                model:Item,
+                as:'Items'
+            }
+        }
+    });
+    const mappedProducts = products.map((p) => {
+        let totalQuantity = 0;
+        p.order_id_Orders.forEach((o) => {
+            o.Items.forEach((i) => {
+                if (i.product_id === p.id) {
+                    totalQuantity += i.quantity;
+                }
+            });
+        });
+        return {
+                ...p.get({ plain: true}),
+                totalQuantity: totalQuantity || 0
+        };
+    });
+    sortedProducts=mappedProducts.sort((a,b)=>b.totalQuantity - a.totalQuantity);
+    res.json(sortedProducts);
 });
 
+router.get('/topRating', async (req, res) => {
+    const products = await Product.findAll({
+        include: {
+            model: Order,
+            as: 'order_id_Orders',
+            include: {
+                model: Item,
+                as: 'Items'
+            }
+        }
+    });
+
+    const mappedProducts = products.map((p) => {
+        let totalRating = 0;
+        let count = 0;
+        p.order_id_Orders.forEach((o) => {
+            o.Items.forEach((i) => {
+                if (i.product_id === p.id && i.rating) {
+                    totalRating += i.rating;
+                    count++;
+                }
+            });
+        });
+
+        
+        const avgRating = count ? (totalRating / count).toFixed(1) : 0;
+
+        return {
+            ...p.get({ plain: true }),
+            avgRating: parseFloat(avgRating)
+        };
+    });
+
+    const sortedProducts = mappedProducts.sort((a, b) => b.avgRating - a.avgRating);
+    res.json(sortedProducts);
+});
 
 module.exports = router;

@@ -68,16 +68,16 @@ router.put('/:product_id/:account_id', async (req, res) => {
     });
 
     if (existingCartItem) {
-      // Nếu tồn tại, tăng giá trị của quantity thêm 1
-      existingCartItem.quantity += 1;
+      // Nếu tồn tại, tăng giá trị của number thêm 1
+      existingCartItem.number += 1;
       await existingCartItem.save();
       res.json(existingCartItem);
     } else {
-      // Nếu chưa tồn tại, thêm mới vào giỏ hàng với quantity là 1
+      // Nếu chưa tồn tại, thêm mới vào giỏ hàng với number là 1
       const newCartItem = await Cart.create({
         product_id,
         account_id,
-        quantity: 1,
+        number: 1,
       });
       res.status(201).json(newCartItem);
     }
@@ -95,8 +95,8 @@ router.patch('/:product_id/:account_id', async (req, res) => {
       where: { product_id, account_id },
     });
     if (existingCartItem) {
-      // Nếu tồn tại, giảm giá trị của quantity đi 1
-      existingCartItem.quantity -= 1;
+      // Nếu tồn tại, giảm giá trị của number đi 1
+      existingCartItem.number -= 1;
       await existingCartItem.save();
       res.json(existingCartItem);
     } else {
