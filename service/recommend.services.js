@@ -210,5 +210,48 @@ router.get('/topRating', async (req, res) => {
     const sortedProducts = mappedProducts.sort((a, b) => b.avgRating - a.avgRating);
     res.json(sortedProducts);
 });
+router.get('/watched', async (req, res) => {
+    try {
+        const accountId = jwt.verify(req.headers.authorization, 'ABC').account.id;
+        const user = await Account.findByPk(accountId, {
+            include: [
+                {
+                    model: Watch,
+                    as: 'Watches',
+                    include: [
+                        {
+                            model: Product,
+                            as: 'product'
+                        }
+                    ],
+                },
+                {
+                    model: Order,
+                    as: 'Orders',
+                    include: [
+                        {
+                            model: Item,
+                            as: 'Items'
+                        }
+                    ],
+                }
+            ],
+        });
 
+        if (!user) {
+            return res.status(404).json({ error: 'Tài khoản không tồn tại' });
+        }
+        // Filter watched products that do not exist in user's orders
+        const watchedProductsNotInOrders = user.Watches.filter(watch => {
+            return !user.Orders.some(order => {
+                return order.Items.some(item => item.product_id === watch.product_id);
+            });
+        });
+
+        res.json( watchedProductsNotInOrders.map(w=>w.product) );
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Lỗi server' });
+    }
+});
 module.exports = router;
