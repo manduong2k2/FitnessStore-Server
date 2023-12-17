@@ -10,8 +10,8 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'manduong2k2@gmail.com', // Thay thế bằng email của bạn
-    pass: 'kzihyxskesrhkeht', // Thay thế bằng mật khẩu của bạn hoặc mã xác thực ứng dụng
+    user: 'manduong2k2@gmail.com', 
+    pass: 'kzihyxskesrhkeht', 
   },
 });
 var verificationCodes = [];
@@ -22,7 +22,7 @@ const router = express.Router();
 router.use(express.json());
 router.use(bodyParser.json());
 router.use(bodyParser.urlencoded({ extended: true }));
-const { sessions, isAuthenticated, isAuthorized } = require('../token.authorizer');
+const { sessions, isAuthenticated, isAuthorized , hashPassword } = require('../token.authorizer');
 
 //Model
 var sequelize = require('../connect');
@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
     account = await Account.findOne({
       where: {
         username: username || null,
-        password: password || null
+        password: hashPassword(password,username) || null
       },
       include: {
         model: Role,
@@ -161,9 +161,19 @@ router.get('/:id', async (req, res) => {
 router.post('/', file.single('image'), async (req, res) => {
   try {
     const newAccount = await Account.create(req.body);
+    //Mã hoá mật khẩu
+    Account.findByPk(newAccount.id)
+        .then((instance) => {
+          if (instance) {
+            instance.password = hashPassword(instance.password , instance.username);
+            return instance.save();
+          } else {
+            console.log('Không tìm thấy đối tượng để cập nhật.');
+          }
+        });
     await FK_Account_Role.create({
-      account_id: newAccount.id, // id của user vừa tạo
-      role_id: 3, // id của từng role
+      account_id: newAccount.id, 
+      role_id: 3,
     });
     const filepath = '../resource/accounts';
     const fullPath = path.join(__dirname, filepath, newAccount.id.toString() + '/');
@@ -250,12 +260,6 @@ router.put('/:id', file.single('image'), async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
-function autoDeletePair(pair) {
-  const index = verificationCodes.indexOf(pair);
-  if (index !== -1) {
-    verificationCodes.splice(index, 1);
-  }
-}
 // recover account
 router.patch('/:email', async (req, res) => {
   try {
@@ -329,13 +333,11 @@ router.put('/',async (req,res)=>{
     const { password , token } = req.body;
     const decodedToken = jwt.verify(token, 'ABC');
     const account = decodedToken.account;
-    account.password = password;
     if(!account){
       console.log('Invalid token!');
       res.status(404).send('Invalid token');
     }
-    account.password = password;
-    await Account.update({ password }, { where: { id: account.id } });
+    await Account.update({ password:hashPassword(password,account.username) }, { where: { id: account.id } });
     res.status(200).send('Change password success');
   }catch(err){
     console.log(err);
