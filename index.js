@@ -24,6 +24,7 @@ const postServices = require('./service/post.services');
 const post_contentServices = require('./service/post_content.services');
 const orderServices = require('./service/order.services');
 const recommendServices = require('./service/recommend.services');
+const statistic = require('./service/product.statistics');
 
 app.use('/account',accountServices);
 app.use('/product',productServices);
@@ -36,6 +37,7 @@ app.use('/post',postServices);
 app.use('/post_content',post_contentServices);
 app.use('/order',orderServices);
 app.use('/recommend',recommendServices);
+app.use('/statistic',statistic);
 
 app.listen(80,async()=>{
     console.log('server running on port 80');
