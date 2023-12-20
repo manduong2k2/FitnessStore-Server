@@ -343,7 +343,19 @@ router.put('/',async (req,res)=>{
     console.log(err);
   }
 });
-
+router.post('/changePassword',async (req,res)=>{
+  try{
+    const account_id = jwt.verify(req.headers.authorization,'ABC').account.id;
+    const account = await Account.findByPk(parseInt(account_id));
+    if(!account) res.status(404).send('Invalid or expired token');
+    const { oldPass , newPass } = req.body;
+    if(hashPassword(oldPass,account.username)!==account.password) res.status(401).send('Incorrect old password'); 
+    await Account.update({ password:hashPassword(newPass,account.username) }, { where: { id: account.id } });
+    res.status(200).send('Change password success');
+  }catch(err){
+    console.log(err);
+  }
+});
 router.delete('/:id', async (req, res) => {
   try {
     const account = await Account.findByPk(req.params.id);
