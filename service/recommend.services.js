@@ -132,17 +132,22 @@ async function UBCF(targetUserItems) {
 function calculateSimilarity(user1Items, user2Items, commonItems) {
     const intersectionSize = commonItems.length;
     const unionSize = new Set([...user1Items, ...user2Items].map(item => item.product_id)).size;
-
     if (unionSize === 0) {
         return 0;
     }
-
     return intersectionSize / unionSize;
 }
 
 // Hàm lấy ra các items chung giữa hai users
 function getCommonItems(user1Items, user2Items) {
-    return user1Items.filter(item1 => user2Items.some(item2 => item2.product_id === item1.product_id));
+    return user1Items.filter(item1 => {
+        const commonItem2 = user2Items.find(item2 => item2.product_id === item1.product_id);
+        if (commonItem2) {
+            const ratingDifferenceSquared = Math.pow(item1.rating - commonItem2.rating, 2);
+            return ratingDifferenceSquared <= 1;
+        }
+        return false;
+    });
 }
 
 router.get('/topSolds',async (req,res)=>{

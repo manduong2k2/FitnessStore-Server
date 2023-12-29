@@ -51,8 +51,7 @@ router.post('/logout', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    var account;
-    account = await Account.findOne({
+    var account = await Account.findOne({
       where: {
         username: username || null,
         password: hashPassword(password,username) || null

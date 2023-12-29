@@ -46,35 +46,37 @@ router.get('/topSales', async (req, res) => {
 
 router.get('/income/:month', async (req, res) => {
     try {
-        const month = req.params.month
+        const requestedMonth = req.params.month;
         const items = await Item.findAll({
             include: [{
                 model: Order,
                 as: 'order',
-            }
-            ]
+            }]
         });
-        const incomeByDate = {};
+
+        const incomeByDate = [];
+
         items.forEach(item => {
             const orderDate = item.order.date;
-            const orderMonth = new Date(orderDate).getMonth() + 1; 
+            const orderMonth = new Date(orderDate).getMonth() + 1; // Lấy tháng từ orderDate
 
-            if (orderMonth.toString() === month) {
-                if (incomeByDate[orderDate]) {
-                    incomeByDate[orderDate] += item.cost;
+            // Kiểm tra xem ngày trong tháng có khớp với tháng được yêu cầu không
+            if (orderMonth.toString() === requestedMonth) {
+                const existingItem = incomeByDate.find(entry => entry.date === orderDate);
+
+                if (existingItem) {
+                    existingItem.income += item.cost;
                 } else {
-                    incomeByDate[orderDate] = item.cost;
+                    incomeByDate.push({ date: orderDate, income: item.cost });
                 }
             }
         });
-        const sortedIncomeArray = Object.entries(incomeByDate);
 
         // Sắp xếp mảng theo ngày từ cũ nhất đến mới nhất
-        sortedIncomeArray.sort((a, b) => new Date(a[0]) - new Date(b[0]));
-        const sortedIncomeByDate = Object.fromEntries(sortedIncomeArray);
-        res.json(sortedIncomeByDate);
-    }
-    catch (err) {
+        incomeByDate.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        res.json(incomeByDate);
+    } catch (err) {
         console.log(err);
     }
 });
