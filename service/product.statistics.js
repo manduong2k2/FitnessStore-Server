@@ -44,9 +44,10 @@ router.get('/topSales', async (req, res) => {
     }
 });
 
-router.get('/income/:month', async (req, res) => {
+router.get('/income/:month/:year', async (req, res) => {
     try {
         const requestedMonth = req.params.month;
+        const requestedYear = req.params.year;
         const items = await Item.findAll({
             include: [{
                 model: Order,
@@ -59,9 +60,10 @@ router.get('/income/:month', async (req, res) => {
         items.forEach(item => {
             const orderDate = item.order.date;
             const orderMonth = new Date(orderDate).getMonth() + 1; // Lấy tháng từ orderDate
+            const orderYear = new Date(orderDate).getFullYear(); // Lấy năm từ orderDate
 
-            // Kiểm tra xem ngày trong tháng có khớp với tháng được yêu cầu không
-            if (orderMonth.toString() === requestedMonth) {
+            // Kiểm tra xem ngày trong tháng và năm có khớp với tháng và năm được yêu cầu không
+            if (orderMonth.toString() === requestedMonth && orderYear.toString() === requestedYear) {
                 const existingItem = incomeByDate.find(entry => entry.date === orderDate);
 
                 if (existingItem) {

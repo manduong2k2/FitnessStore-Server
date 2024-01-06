@@ -110,12 +110,13 @@ async function UBCF(targetUserItems) {
         if (user.id !== targetUserItems[0].user_id) {
             const commonItems = getCommonItems(targetUserItems, getUserItems(user));
             const similarity = calculateSimilarity(targetUserItems, getUserItems(user), commonItems);
+            if(similarity>0)
             similarities.push({user, similarity});
         }
     }
+    similarities.sort((a, b) => b.similarity - a.similarity);
     // Lấy ra 5 user tương đồng
     const topSimilarUsers = similarities.slice(0, 5);
-
     // Trả về các items của mỗi user đó, loại bỏ các items đã có trong targetUserItems
     const recommendations = [];
     for (const { user } of topSimilarUsers) {
@@ -143,7 +144,7 @@ function getCommonItems(user1Items, user2Items) {
     return user1Items.filter(item1 => {
         const commonItem2 = user2Items.find(item2 => item2.product_id === item1.product_id);
         if (commonItem2) {
-            const ratingDifferenceSquared = Math.pow(item1.rating - commonItem2.rating, 2);
+            const ratingDifferenceSquared = Math.pow(item1.avgRating - commonItem2.avgRating, 2);
             return ratingDifferenceSquared <= 1;
         }
         return false;
